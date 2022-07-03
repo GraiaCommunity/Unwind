@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=58.3.0", "wheel>=0.37.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+author = [
+    {name = "RF-Tar-Railt", email = "rf_tar_railt@qq.com"},
+]
+name = "graiax-mod-unwind"
+version = "0.1.0"
+description = "A simple solution to analysis and extract information from traceback."
+readme = "README.md"
+requires_python = ">=3.8"
+license = {text = "MIT"}
+keywords = [
+    "traceback",
+    "exception",
+    "crash-report"
+]
