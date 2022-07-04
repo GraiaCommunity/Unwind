@@ -29,41 +29,12 @@ def _exc_hook(event, *args):
 sys.addaudithook(_exc_hook)
 
 
-def global_reports():
+def global_reports() -> List[TReport]:
     return _base_report.reports
 
 
-def global_errors():
+def global_errors() -> List[TError]:
     return _base_report.errors
 
 
 __all__ = ["Report", "ReportFlag", "TReport", "TError", "global_reports", "global_errors", "get_report", "add_report"]
-
-
-if __name__ == '__main__':
-    import ctypes
-
-    with Report() as report:
-        ctypes.cast(1, ctypes.py_object)
-        raise RuntimeError
-
-    print(report.errors)
-    print(report.reports)
-
-
-    def main():
-        def test(num: int):
-            if num > 6:
-                raise RuntimeError("A")
-            return num ** 2
-
-        b = 0
-        for i in range(10):
-            b += test(i)
-        return b
-
-
-    with Report() as report:
-        a = main()
-    for rep in report.reports:
-        print(rep)

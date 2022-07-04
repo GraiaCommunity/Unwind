@@ -5,8 +5,8 @@ with Report() as report:
     ctypes.cast(1, ctypes.py_object)
     raise RuntimeError
 
-print(report.errors)
-print(report.reports)
+# print(report.errors)
+# print(report.reports)
 
 
 def main():
@@ -21,7 +21,7 @@ def main():
     return b
 
 
-with Report() as report:
+with Report() as report1:
     a = main()
-for rep in report.reports:
+for rep in report1.reports:
     print(rep)

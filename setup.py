@@ -5,7 +5,7 @@ with open("README.rst", "r", encoding='utf-8') as fh:
 
 setuptools.setup(
     name="graiax-mod-unwind",
-    version="0.1.0",
+    version="0.2.0",
     author="RF-Tar-Railt",
     author_email="rf_tar_railt@qq.com",
     description="A simple solution to analysis and extract information from traceback.",
