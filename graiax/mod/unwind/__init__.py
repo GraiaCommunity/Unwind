@@ -15,7 +15,7 @@ def add_report(target: Callable[[TError, List[TReport]], Any]):
 
 
 def _exc_hook(event, *args):
-    if event in ["sys.excepthook", "crash-report.exit"]:
+    if event == "sys.excepthook":
         _base_report.errors = [args]
         _base_report.reports.clear()
         with suppress(StopIteration):
@@ -23,6 +23,10 @@ def _exc_hook(event, *args):
             _base_report.reports = get_report(tb)
             for r in _callback:
                 r(args, _base_report.reports)  # type: ignore
+        return
+    if event == "crash-report.exit":
+        _base_report.errors = [args[0][0]]
+        _base_report.reports = args[0][1]
         return
 
 

@@ -5,8 +5,47 @@ import re
 import faulthandler
 import inspect
 from pathlib import Path
+from io import BytesIO
+import tokenize
 
 from .typing import _ReportCode, _ReportExc, _ReportCall, TError, TReport, ReportFlag, _TraceContext, _eval_safe
+
+PAT_RAISE = re.compile(r"\s*raise (?P<exc>.+?)$")
+PAT_EXCEPTION = re.compile(r"(?P<type>[^(]+)(?P<content>\(.*\))")
+PAT_CALL = re.compile(r".*?(?P<path>[^(=]+?)\((?P<args>.*)\)\s?$")
+PAT_KEY_VALUE = re.compile(r"(?P<key>.+)\s=\s(?P<value>.+)")
+PAT_ITER = re.compile("(async )?for .+ in (?P<iterable>.+?):$")
+PAT_CONTEXT = re.compile("(async )?with (?P<context>.+?)( )?(as .+)?$")
+PAT_AWAIT = re.compile(r".*?await (?P<path>[^(=]+?)\s?$")
+
+
+def _split(input_: str) -> List[str]:
+    left: List[int] = []
+    right: List[int] = []
+    strings = list(input_)
+
+    def _tkn(source: str):
+        source = source.encode("utf-8")
+        source = BytesIO(source)
+        try:
+            yield from tokenize.tokenize(source.readline)
+        except tokenize.TokenError:
+            return
+
+    for token in _tkn(input_):
+        type_, string, (_, col), *_ = token
+        if type_ == tokenize.ENCODING:
+            continue
+        if type_ == tokenize.OP:
+            if string == "(":
+                left.append(col)
+            elif string == ")":
+                right.append(col)
+            elif string == "," and len(left) - len(right) == 1:
+                strings[col] = '\1'
+    return [
+        c.strip() for c in ''.join(strings[left[0] + 1:right[min(len(left), len(right)) - 1]]).split('\1') if c.strip()
+    ]
 
 
 def _handle_exc(slot: Dict, match: Dict[str, str], info: inspect.FrameInfo) -> _ReportExc:
@@ -14,7 +53,7 @@ def _handle_exc(slot: Dict, match: Dict[str, str], info: inspect.FrameInfo) -> _
     _globals = info.frame.f_globals
     slot['flag'] = ReportFlag.ACTIVE
     exc_s = match['exc']
-    if _mat := re.match(r"(?P<type>[^(]+)(?P<content>\(.*\))", exc_s):
+    if _mat := PAT_EXCEPTION.match(exc_s):
         exc_t = _mat.groupdict()['type']
         slot['type'] = _globals.get(exc_t, _locals.get(exc_t, info.frame.f_builtins.get(exc_t, None)))
         slot['content'] = _mat.groupdict()['content'][1:-1]
@@ -30,10 +69,7 @@ def _handle_call(
 ) -> _ReportCall:
     _locals = info.frame.f_locals
     _globals = info.frame.f_globals
-    _args = match['args']
-    if _args.startswith("(") and _args.endswith(")"):
-        _args = _args[1:-1]
-    args = [c.strip() for c in _args.split(',') if c.strip()]
+    args = _split(f"({match['args']})")
     paths = match['path'].strip().split()
     parts, end = paths[:-1], paths[-1]
     slot['flag'] = ReportFlag.AWAIT_AWAITABLE if "await" in parts else ReportFlag.CALL_CALLABLE
@@ -51,8 +87,8 @@ def _handle_call(
         _paths = arg[0:start_index + f_len].split()
         _parts, end = _paths[:-1], _paths[-1]
         slot['flag'] = ReportFlag.AWAIT_AWAITABLE if "await" in _parts else ReportFlag.CALL_CALLABLE
-        if arg[start_index+f_len:].find('(') > -1 and (right := arg[start_index+f_len:].find(')')) > -1:
-            args = [c.strip() for c in arg[start_index+f_len:][1:right].split(',') if c.strip()]
+        if arg[start_index + f_len:].find('(') > -1 and arg[start_index + f_len:].find(')') > -1:
+            args = _split(arg[start_index + f_len:])
         else:
             args = []
         break
@@ -69,16 +105,13 @@ def _handle_call(
     slot['callable'] = _may_callable
     call_args = {}
     try:
-        sig = inspect.signature(_may_callable)
-        parameter = [
-            param.name for param in sig.parameters.values() if param.kind in (
-                param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD)
-        ]
-        vararg = [param.name for param in sig.parameters.values() if param.kind == param.VAR_POSITIONAL]
+        param = inspect.signature(_may_callable).parameters
+        names = [p.name for p in param.values() if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
+        vararg = [p.name for p in param.values() if p.kind == p.VAR_POSITIONAL]
         if not vararg:
             vararg.append("_unknown_name")
     except (ValueError, TypeError):
-        parameter = []
+        names = []
         vararg = ["_unknown_name"]
 
     for arg in args.copy():
@@ -86,7 +119,7 @@ def _handle_call(
             _arg = arg.lstrip('*')
             call_args[_arg] = _locals.get(_arg, _eval_safe(_arg, _globals, _locals))
             args.remove(arg)
-        elif _mat := re.match(r"(?P<key>.+)\s=\s(?P<value>.+)", arg):
+        elif _mat := PAT_KEY_VALUE.match(arg):
             key, _arg = _mat.groups()
             call_args[key] = _locals.get(_arg, _eval_safe(_arg, _globals, _locals))
             args.remove(arg)
@@ -94,7 +127,7 @@ def _handle_call(
             call_args[arg] = _locals[arg]
             args.remove(arg)
 
-    for name, arg in zip(parameter, args.copy()):
+    for name, arg in zip(names, args.copy()):
         call_args[name] = _locals.get(arg, _eval_safe(arg, _globals, _locals))
         args.remove(arg)
     if args:
@@ -110,32 +143,31 @@ def _handle_code(
     _locals = info.frame.f_locals
     _globals = info.frame.f_globals
     content = info.code_context[0].strip()
-    if content.endswith(":"):
-        if mat := re.match("(async )?for .+ in (?P<iterable>.+?):$", content):
-            match = mat.groupdict()['iterable']
-            if _match := re.match(r"(?P<path>.+)\((?P<args>.*)\)", match):
-                _slot = _handle_call(slot, _match.groupdict(), info, previous)
-                _slot.flag = ReportFlag.ITER_ITERABLE
-                return _slot
-            slot['flag'] = ReportFlag.ITER_ITERABLE
-            if _ch := _globals.get(match, _locals.get(match, info.frame.f_builtins.get(match, None))):
-                slot['args'] = {match: _ch}
-            else:
-                slot['args'] = {"_unknown_name": _eval_safe(match, _globals, _locals)}
-            return _ReportCode(**slot)
-        if mat := re.match("(async )?with (?P<context>.+?)( )?(as .+)?$", content):
-            match = mat.groupdict()['context']
-            if _match := re.match(r"(?P<path>.+)\((?P<args>.*)\)", match):
-                _slot = _handle_call(slot, _match.groupdict(), info, previous)
-                _slot.flag = ReportFlag.ENTER_CONTEXT
-                return _slot
-            slot['flag'] = ReportFlag.ENTER_CONTEXT
-            if _ch := _globals.get(match, _locals.get(match, info.frame.f_builtins.get(match, None))):
-                slot['args'] = {match: _ch}
-            else:
-                slot['args'] = {"_unknown_name": _eval_safe(match, _globals, _locals)}
-            return _ReportCode(**slot)
-    if mat := re.match(r".*?await (?P<path>[^(=]+?)\s?$", content):
+    if mat := PAT_ITER.match(content):
+        match = mat.groupdict()['iterable']
+        if _match := PAT_CALL.match(match):
+            _slot = _handle_call(slot, _match.groupdict(), info, previous)
+            _slot.flag = ReportFlag.ITER_ITERABLE
+            return _slot
+        slot['flag'] = ReportFlag.ITER_ITERABLE
+        if _ch := _globals.get(match, _locals.get(match, info.frame.f_builtins.get(match, None))):
+            slot['args'] = {match: _ch}
+        else:
+            slot['args'] = {"_unknown_name": _eval_safe(match, _globals, _locals)}
+        return _ReportCode(**slot)
+    if mat := PAT_CONTEXT.match(content):
+        match = mat.groupdict()['context']
+        if _match := PAT_CALL.match(match):
+            _slot = _handle_call(slot, _match.groupdict(), info, previous)
+            _slot.flag = ReportFlag.ENTER_CONTEXT
+            return _slot
+        slot['flag'] = ReportFlag.ENTER_CONTEXT
+        if _ch := _globals.get(match, _locals.get(match, info.frame.f_builtins.get(match, None))):
+            slot['args'] = {match: _ch}
+        else:
+            slot['args'] = {"_unknown_name": _eval_safe(match, _globals, _locals)}
+        return _ReportCode(**slot)
+    if mat := PAT_AWAIT.match(content):
         slot['flag'] = ReportFlag.AWAIT_AWAITABLE
         paths = mat.groupdict()['path'].strip().split(' ')[-1].split('.')
         _may_callable = None
@@ -178,9 +210,9 @@ def get_report(e: Union[BaseException, TracebackType], most_recent_first: bool =
                 info.frame.f_locals.copy()
             )
         }
-        if mat := re.match(r"\s*raise (?P<exc>.+?)$", info.code_context[0]):
+        if mat := PAT_RAISE.match(info.code_context[0]):
             _reports.append(_handle_exc(slot, mat.groupdict(), info))
-        elif mat := re.match(r".*?(?P<path>[^(=]+?)\((?P<args>.*)\)\s?$", info.code_context[0]):
+        elif mat := PAT_CALL.match(info.code_context[0]):
             _reports.append(_handle_call(slot, mat.groupdict(), info, frames[index - 1]))
         else:
             _reports.append(_handle_code(slot, info, frames[index - 1]))
@@ -205,7 +237,6 @@ class Report:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        sys.audit("crash-report.exit", exc_type, exc_val, exc_tb)
         self.errors.append((exc_type, exc_val, exc_tb))
         if faulthandler.is_enabled():
             with self._path.open("w+") as f:
@@ -218,6 +249,7 @@ class Report:
             faulthandler.disable()
         if exc_tb:
             self.reports = get_report(exc_tb)
+            sys.audit("crash-report.exit", self.errors[0], self.reports)
         return exc_type is not None and self._supress
 
 

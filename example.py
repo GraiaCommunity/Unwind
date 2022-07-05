@@ -1,12 +1,11 @@
 import ctypes
-from graiax.mod.unwind import Report
+from graiax.mod.unwind import Report, get_report
 
 with Report() as report:
     ctypes.cast(1, ctypes.py_object)
     raise RuntimeError
 
-# print(report.errors)
-# print(report.reports)
+print(report.errors)
 
 
 def main():
@@ -25,3 +24,11 @@ with Report() as report1:
     a = main()
 for rep in report1.reports:
     print(rep)
+
+try:
+    with Report(supress=False) as report1:
+        a = main()
+except RuntimeError as e:
+    print(report1.errors)
+    print(get_report(e))
+    raise

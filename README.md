@@ -13,8 +13,17 @@ with Report() as report:
     c = 'a'
     d = 1 + c
 
-print(report.errors)
-print(report.reports)
+print(report.errors[0])
+print(report.reports[0])
+
+'''
+(<class 'TypeError'>, TypeError("unsupported operand type(s) for +: 'int' and 'str'"), <traceback object at xxxxx>)
+---------report--------
+info = _TraceContext(file='xxxxxx', line=7, name='<module>', code='d = 1 + c', locals={...})
+flag = operate
+args = {'c': 'a'}
+---------end------
+'''
 ```
 
 or
