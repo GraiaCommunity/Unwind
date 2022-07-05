@@ -13,7 +13,7 @@ from .typing import _ReportCode, _ReportExc, _ReportCall, TError, TReport, Repor
 PAT_RAISE = re.compile(r"\s*raise (?P<exc>.+?)$")
 PAT_EXCEPTION = re.compile(r"(?P<type>[^(]+)(?P<content>\(.*\))")
 PAT_CALL = re.compile(r".*?(?P<path>[^(=]+?)\((?P<args>.*)\)\s?$")
-PAT_KEY_VALUE = re.compile(r"(?P<key>.+)\s=\s(?P<value>.+)")
+PAT_KEY_VALUE = re.compile(r"(?P<key>.+)\s?=\s?(?P<value>.+)")
 PAT_ITER = re.compile("(async )?for .+ in (?P<iterable>.+?):$")
 PAT_CONTEXT = re.compile("(async )?with (?P<context>.+?)( )?(as .+)?$")
 PAT_AWAIT = re.compile(r".*?await (?P<path>[^(=]+?)\s?$")
@@ -190,20 +190,33 @@ def _handle_code(
     return _ReportCode(**slot)
 
 
-def get_report(e: Union[BaseException, TracebackType], most_recent_first: bool = False) -> List[TReport]:
+def get_report(
+        e: Union[BaseException, TracebackType],
+        most_recent_first: bool = False,
+        whole_trace: bool = False
+) -> List[TReport]:
     """
     依据传入的错误或 Traceback 生成一个回溯帧和所有较低帧的记录列表
 
     Args:
         e: 需要进行回溯的错误或traceback
         most_recent_first: 是否让最近调用的帧的报告排在列表首位, 默认为 False (即 most recent call last)
+        whole_trace: 是否追踪所有帧 (即回溯较高帧), 默认为 False
     """
     _reports = []
     if isinstance(e, BaseException):
         e = e.__traceback__
     frames = inspect.getinnerframes(e)
     frames.reverse()
+    if whole_trace:
+        frames.extend(inspect.getouterframes(e.tb_frame))
     for index, info in enumerate(frames):
+        if info.code_context is None:
+            _info = _TraceContext(
+                info.filename, info.lineno, info.function, '', info.frame.f_locals.copy()
+            )
+            _reports.append(_ReportCode(_info, ReportFlag.UNKNOWN, args={}))
+            continue
         slot = {
             "info": _TraceContext(
                 info.filename, info.lineno, info.function, info.code_context[0].strip(),

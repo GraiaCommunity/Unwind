@@ -6,6 +6,9 @@ TError = Tuple[Type[BaseException], BaseException, TracebackType]
 
 
 class ReportFlag(str, Enum):
+    UNKNOWN = "unknown"
+    """此处代码无法被获取, 请检查代码逻辑"""
+
     ACTIVE = "active"
     """此处代码主动抛出了一个错误"""
 
