@@ -8,7 +8,7 @@ usage
 
 .. code:: python
 
-   from graiax.mod.unwind import Report
+   from unwind import Report
 
    with Report() as report:
        a = 1
@@ -23,7 +23,7 @@ or
 
 .. code:: python
 
-   from graiax.mod.unwind import get_report
+   from unwind import get_report
 
    try:
        a = 1

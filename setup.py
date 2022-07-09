@@ -4,7 +4,7 @@ with open("README.rst", "r", encoding='utf-8') as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="graiax-mod-unwind",
+    name="unwind",
     version="0.3.0",
     author="RF-Tar-Railt",
     author_email="rf_tar_railt@qq.com",
