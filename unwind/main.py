@@ -19,23 +19,56 @@ PAT_CONTEXT = re.compile("(async )?with (?P<context>.+?)( )?(as .+)?$")
 PAT_AWAIT = re.compile(r".*?await (?P<path>[^(=]+?)\s?$")
 
 
+def _tkn(source: str):
+    source = source.encode("utf-8")
+    source = BytesIO(source)
+    try:
+        yield from tokenize.tokenize(source.readline)
+    except tokenize.TokenError:
+        return
+
+
+def _sub(input_: str) -> str:
+    res: List[int] = []
+    r_bracket: Dict[str, int] = {}
+    rev_s = ''.join(reversed(list(input_)))
+
+    for token in _tkn(rev_s):
+        type_, string, (_, col), *_ = token
+        if type_ == tokenize.OP:
+            if string in {")", "]", "}"}:
+                r_bracket[string] = 1 + r_bracket.get(string, 0)
+            if string in {"(", "[", "{"}:
+                if string == "(" and r_bracket.get(")"):
+                    if r_bracket[')'] > 0:
+                        r_bracket[')'] -= 1
+                    else:
+                        r_bracket.pop(')')
+                elif string == "[" and r_bracket.get("]"):
+                    if r_bracket[']'] > 0:
+                        r_bracket[']'] -= 1
+                    else:
+                        r_bracket.pop(']')
+                elif string == "{" and r_bracket.get("}"):
+                    if r_bracket['}'] > 0:
+                        r_bracket['}'] -= 1
+                    else:
+                        r_bracket.pop('}')
+                else:
+                    res.append(col)
+            if string in {"=", ",", ";"} and not r_bracket:
+                res.append(col)
+
+    return input_[-min(res):]
+
+
 def _split(input_: str) -> List[str]:
     left: List[int] = []
     right: List[int] = []
     strings = list(input_)
 
-    def _tkn(source: str):
-        source = source.encode("utf-8")
-        source = BytesIO(source)
-        try:
-            yield from tokenize.tokenize(source.readline)
-        except tokenize.TokenError:
-            return
-
     for token in _tkn(input_):
         type_, string, (_, col), *_ = token
-        if type_ == tokenize.ENCODING:
-            continue
         if type_ == tokenize.OP:
             if string == "(":
                 left.append(col)
@@ -84,7 +117,7 @@ def _handle_call(
             continue
         f_len = len(_next)
         start_index = arg.find(_next)
-        _paths = arg[0:start_index + f_len].split()
+        _paths = _sub(arg[:start_index + f_len]).split()
         _parts, end = _paths[:-1], _paths[-1]
         slot['flag'] = ReportFlag.AWAIT_AWAITABLE if "await" in _parts else ReportFlag.CALL_CALLABLE
         if arg[start_index + f_len:].find('(') > -1 and arg[start_index + f_len:].find(')') > -1:
@@ -93,15 +126,8 @@ def _handle_call(
             args = []
         break
 
-    _may_callable = None
+    _may_callable = _eval_safe(end, _globals, _locals)
 
-    for p in end.split('.'):
-        if obj := _globals.get(p, _locals.get(p, info.frame.f_builtins.get(p, None))):
-            _may_callable = obj
-        elif obj := getattr(_may_callable, p, None):
-            _may_callable = obj
-        else:
-            _may_callable = p
     slot['callable'] = _may_callable
     call_args = {}
     try:
@@ -169,15 +195,8 @@ def _handle_code(
         return _ReportCode(**slot)
     if mat := PAT_AWAIT.match(content):
         slot['flag'] = ReportFlag.AWAIT_AWAITABLE
-        paths = mat.groupdict()['path'].strip().split(' ')[-1].split('.')
-        _may_callable = None
-        for p in paths:
-            if obj := _globals.get(p, _locals.get(p, info.frame.f_builtins.get(p, None))):
-                _may_callable = obj
-            elif obj := getattr(_may_callable, p):
-                _may_callable = obj
-            else:
-                _may_callable = p
+        paths = mat.groupdict()['path'].strip().split(' ')[-1]
+        _may_callable = _eval_safe(paths, _globals, _locals)
         slot['callable'] = _may_callable
         slot['args'] = {}
         return _ReportCall(**slot)

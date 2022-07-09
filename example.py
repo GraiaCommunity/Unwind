@@ -1,5 +1,5 @@
 import ctypes
-from graiax.mod.unwind import Report, get_report
+from unwind import Report, get_report
 
 with Report() as report:
     ctypes.cast(1, ctypes.py_object)

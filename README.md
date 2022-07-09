@@ -2,10 +2,16 @@
 
 A simple solution to analysis and extract information from traceback
 
+## install
+
+```bash
+pip install unwind
+```
+
 ## usage
 
 ```python
-from graiax.mod.unwind import Report
+from unwind import Report
 
 with Report() as report:
     a = 1
@@ -29,7 +35,7 @@ args = {'c': 'a'}
 or
 
 ```python
-from graiax.mod.unwind import get_report
+from unwind import get_report
 
 try:
     a = 1
