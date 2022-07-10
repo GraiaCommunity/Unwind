@@ -7,7 +7,7 @@ author = [
     {name = "RF-Tar-Railt", email = "rf_tar_railt@qq.com"},
 ]
 name = "unwind"
-version = "0.2.2"
+version = "0.3.1"
 description = "A simple solution to analysis and extract information from traceback."
 readme = "README.md"
 requires_python = ">=3.8"

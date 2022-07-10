@@ -88,11 +88,19 @@ def _handle_exc(slot: Dict, match: Dict[str, str], info: inspect.FrameInfo) -> _
     exc_s = match['exc']
     if _mat := PAT_EXCEPTION.match(exc_s):
         exc_t = _mat.groupdict()['type']
-        slot['type'] = _globals.get(exc_t, _locals.get(exc_t, info.frame.f_builtins.get(exc_t, None)))
+        slot['type'] = _eval_safe(exc_t, _globals, _locals)
         slot['content'] = _mat.groupdict()['content'][1:-1]
     else:
-        slot['content'] = exc_s
-        slot['type'] = _globals.get(exc_s, _locals.get(exc_s, info.frame.f_builtins.get(exc_s, None)))
+        may_exc = _eval_safe(exc_s, _globals, _locals)
+        if isinstance(may_exc, BaseException):
+            slot['content'] = may_exc.args
+            slot['type'] = may_exc.__class__
+        elif issubclass(may_exc, BaseException):
+            slot['content'] = "..."
+            slot['type'] = may_exc
+        else:
+            slot['content'] = may_exc
+            slot['type'] = BaseException
     return _ReportExc(**slot)
 
 

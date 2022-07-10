@@ -6,6 +6,7 @@ with Report() as report:
     raise RuntimeError
 
 print(report.errors)
+print(report.reports)
 
 
 def main():

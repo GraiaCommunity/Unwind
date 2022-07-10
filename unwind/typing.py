@@ -50,7 +50,7 @@ class _BaseReport:
         return (
             "---------report--------\n" +
             "\n".join(f"{k} = {v}" for k, v in self.dict().items() if not isinstance(v, _BaseReport)) +
-            "\n---------end------"
+            "\n---------end-----------"
         )
 
     def dict(self):
