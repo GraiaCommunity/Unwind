@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 author = [
     {name = "RF-Tar-Railt", email = "rf_tar_railt@qq.com"},
 ]
-name = "graiax-mod-unwind"
+name = "unwind"
 version = "0.2.2"
 description = "A simple solution to analysis and extract information from traceback."
 readme = "README.md"
