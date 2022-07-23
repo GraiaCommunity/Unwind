@@ -95,7 +95,7 @@ def _handle_exc(slot: Dict, match: Dict[str, str], info: inspect.FrameInfo) -> _
         if isinstance(may_exc, BaseException):
             slot['content'] = may_exc.args
             slot['type'] = may_exc.__class__
-        elif issubclass(may_exc, BaseException):
+        elif inspect.isclass(may_exc) and issubclass(may_exc, BaseException):
             slot['content'] = "..."
             slot['type'] = may_exc
         else:

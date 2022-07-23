@@ -5,7 +5,7 @@ with open("README.rst", "r", encoding='utf-8') as fh:
 
 setuptools.setup(
     name="unwind",
-    version="0.3.1",
+    version="0.3.2",
     author="RF-Tar-Railt",
     author_email="rf_tar_railt@qq.com",
     description="A simple solution to analysis and extract information from traceback.",
