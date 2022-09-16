@@ -25,7 +25,20 @@ print(report.reports[0])
 '''
 (<class 'TypeError'>, TypeError("unsupported operand type(s) for +: 'int' and 'str'"), <traceback object at xxxxx>)
 ---------report--------
-info = _TraceContext(file='xxxxxx', line=7, name='<module>', code='d = 1 + c', locals={...})
+info = TraceContext(
+    file='D:/Download/Projects/Unwind/example.py'
+    line=59
+    name='<module>'
+####====context====####
+    b = 2
+    c = 'a'
+    d = 1 + c
+
+print(report.errors[0])
+####====context====####
+    error_line='d = 1 + c'
+    locals={'__name__': '__main__', '__doc__': None, '__package__': None, '__loader__': <_frozen_importlib_external.SourceFileLoader object at 0x0000020F11200910>, '__spec__': None, '__annotations__': {}, '__builtins__': <module 'builtins' (built-in)>, '__file__': 'D:/Download/Projects/Unwind/example.py', '__cached__': None, 'Report': <class 'unwind.main.Report'>, 'report': <unwind.main.Report object at 0x0000020F112D86D0>, 'a': 1, 'b': 2, 'c': 'a'}
+)
 flag = operate
 args = {'c': 'a'}
 ---------end------
