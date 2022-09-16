@@ -1,21 +1,35 @@
 [build-system]
-requires = ["setuptools>=58.3.0", "wheel>=0.37.0"]
-build-backend = "setuptools.build_meta"
+requires = ["pdm-pep517>=1.0.0"]
+build-backend = "pdm.pep517.api"
 
 [project]
-author = [
-    {name = "RF-Tar-Railt", email = "rf_tar_railt@qq.com"},
-]
 name = "unwind"
-version = "0.3.2"
+version = "0.4.0"
 description = "A simple solution to analysis and extract information from traceback."
-readme = "README.md"
-requires_python = ">=3.8"
-license = {text = "MIT"}
-keywords = [
-    "traceback",
-    "exception",
-    "crash-report"
+authors = [
+    {name = "RF-Tar-Railt",email = "rf_tar_railt@qq.com"}
 ]
-
+dependencies = []
+requires-python = ">=3.8"
+readme = "README.md"
+license = {text = "MIT"}
+keywords = ["traceback", "exception", "crash-report"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+]
 [project.urls]
+Homepage = "https://github.com/GraiaCommunity/Unwind"
+"Bug Reports" = "https://github.com/GraiaCommunity/Unwind/issues"
+Source = "https://github.com/GraiaCommunity/Unwind"
+
+
+[tool]
+[tool.pdm]
+[tool.pdm.build]
+includes = ["unwind/"]

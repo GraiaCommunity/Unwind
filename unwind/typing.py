@@ -1,6 +1,6 @@
 from enum import Enum
 from types import TracebackType
-from typing import Tuple, Type, NamedTuple, Callable, Optional, Dict, Any, Union
+from typing import Any, Callable, Dict, NamedTuple, Optional, Tuple, Type, Union, List
 
 TError = Tuple[Type[BaseException], BaseException, TracebackType]
 
@@ -30,10 +30,26 @@ class ReportFlag(str, Enum):
 
 class _TraceContext(NamedTuple):
     file: str
-    line: int
+    line_index: int
     name: str
-    code: str
+    codes: List[str]
+    code_line: str
     locals: Dict[str, Any]
+
+    def __repr__(self):
+        code = "\n".join(self.codes)
+        return (
+            "TraceContext(\n"
+            f"    file={self.file!r}\n"
+            f"    line={self.line_index}\n"
+            f"    name={self.name!r}\n"
+            f"####====context====####\n"
+            f"{code}\n"
+            f"####====context====####\n"
+            f"    error_line={self.code_line!r}\n"
+            f"    locals={self.locals}\n"
+            ")"
+        )
 
 
 class _BaseReport:
@@ -48,9 +64,13 @@ class _BaseReport:
 
     def __repr__(self):
         return (
-            "---------report--------\n" +
-            "\n".join(f"{k} = {v}" for k, v in self.dict().items() if not isinstance(v, _BaseReport)) +
-            "\n---------end-----------"
+            "\n---------report--------\n"
+            + "\n".join(
+                f"{k} = {v}"
+                for k, v in self.dict().items()
+                if not isinstance(v, _BaseReport)
+            )
+            + "\n---------end-----------"
         )
 
     def dict(self):
